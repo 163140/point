@@ -4,23 +4,28 @@
 -author("ea1a87").
 
 
--type point():: {point, float(), float()}	. %% Точка в двухмерном пространстве
--type line() ::	{line, point(), point()}	.	%% Прямая на плоскости проходящая заданная двумя точками
+-type point():: {point, number(), number()}.	%% Точка в двухмерном пространстве
+-type line() ::	{line	, point()	, point()	}.	%% Прямая на плоскости проходящая заданная двумя точками
 
 %% @doc Возвращает новую точку заданную координатами X,Y
 -spec new( number(), number() ) -> point().
-new(X,Y)		-> {point, float(X), float(Y)}.
-new_test()	-> ?_assert(new(10,30) =:= {point, 10, 30}).
+new(X,Y)		-> 
+	if
+		is_number(X) and is_number(Y) -> {point, float(X), float(Y)};
+		true													-> error(badpoint)
+end.
+new_test()	-> ?_assert(new(10,30)		  =:= {point, 10, 30}).
+new_test()	-> ?_assert(new([90,90],30) =:= {error, badpoint}).
 
 %% TODO: UNTESTED
 %% @doc Проверяет лежит ли точка на прямой. Возвращает true/false
--spec at_line( Line::line(), A::point() ) -> atom(). 
+-spec at_line( line(), point() ) -> atom(). 
 at_line(Line, A)	 ->
-	{point, Xa, Ya} = A,
-	Y = line:findY(Line, Xa),
+	{point, X, Y} = A,
+	Y1 = line:find('y?', Line, X),
 	if
-		Y/=Ya -> false;
-		true	-> true
+		Y /= Y1 -> false;
+		true		-> true
 	end
 .
 at_line_test_()		-> [
@@ -30,7 +35,7 @@ at_line_test_()		-> [
 ].
 
 %% @doc			Складывает две точки. Возвращает точку с координатами (X1+X2,Y1+Y2).
--spec shift( A::point(), B::point() )->point().
+-spec shift( point(), point() )->point().
 shift(A, B)	 ->
 	{point, Xa, Ya} = A,
 	{point, Xb, Yb} = B,
@@ -45,8 +50,8 @@ sum(A, B) -> shift(A, B).
 %% @doc			Зеркалирует точку относительно начала координат / Умножает точку на -1. Возвращает точку с координатами (-X,-Y).
 -spec neg( point() )->point().
 neg(A)		 ->
-	{point, X, Y} = A,
-	{point, -X, -Y}.
+	{point,	 X,	 Y} = A,
+	{point,	-X, -Y}.
 neg_test() -> ?_assert( neg({point, 15, 3}) =:= {point, -15, -3} ).
 
 %% @doc			Отзеркаливает точку относительно прямой. Точку с координатами (X1, Y1) зеркальную заданной. 
@@ -54,10 +59,12 @@ neg_test() -> ?_assert( neg({point, 15, 3}) =:= {point, -15, -3} ).
 -spec mirror( line(), point() ) -> point().
 mirror(Line, A) ->
 	{point, Xa, Ya}= A,
-	C1	= line:intersection(Line, {line, {point, 0, Ya}, A}),
-	C2	= line:intersection(Line, {line, {point, Xa, 0}, A}),
-	AC1	= line:len({line, A, C1}),
-	AC2	= line:len({line, A, C2}),
+	D1	=	point:new(0, Ya),
+	D2	=	point:new(Xa, 0),
+	C1	= line:intersect(Line, line:new(D1, A)),
+	C2	= line:intersect(Line, line:new(D2, A)),
+	AC1	= line:len(line:new(A, C1)),
+	AC2	= line:len(line:new(A, C2)),
 	A		= math:atan(AC1/AC2),
 	DX			= AC1 * math:sin(A)*direction(x, A, C1).
 	DY			= math:sqrt(4 * AC1 * AC1 * math:pow(math:sin(A), 2) - (DX * DX )) * direction(y, A, C2),

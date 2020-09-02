@@ -11,13 +11,11 @@
 -spec new( number(), number() ) -> point().
 new(X,Y)		-> 
 	if
-		is_number(X) and is_number(Y) -> {point, float(X), float(Y)};
-		true													-> error(badpoint)
+		is_number(X) and is_number(Y) -> {point, X, Y};
+		true													-> error("badpoint")
 end.
-new_test()	-> ?_assert(new(10,30)		  =:= {point, 10, 30}).
-new_test()	-> ?_assert(new([90,90],30) =:= {error, badpoint}).
+new_test_()	-> ?_assertEqual(new(10, 30), {point, 10, 30}).
 
-%% TODO: UNTESTED
 %% @doc Проверяет лежит ли точка на прямой. Возвращает true/false
 -spec at_line( line(), point() ) -> atom(). 
 at_line(Line, A)	 ->
@@ -58,42 +56,60 @@ neg_test() -> ?_assert( neg({point, 15, 3}) =:= {point, -15, -3} ).
 %% 					Подробности на поясняющем рисунке
 -spec mirror( line(), point() ) -> point().
 mirror(Line, A) ->
-	{point, Xa, Ya}= A,
-	D1	=	point:new(0, Ya),
-	D2	=	point:new(Xa, 0),
-	C1	= line:intersect(Line, line:new(D1, A)),
-	C2	= line:intersect(Line, line:new(D2, A)),
+	{point, X, Y}= A,
+	C1	= new(line:find('x?', Line, Y), Y												),
+	C2	= new(X												, line:find('y?', Line, X)),
 	AC1	= line:len(line:new(A, C1)),
 	AC2	= line:len(line:new(A, C2)),
-	A		= math:atan(AC1/AC2),
-	DX			= AC1 * math:sin(A)*direction(x, A, C1).
-	DY			= math:sqrt(4 * AC1 * AC1 * math:pow(math:sin(A), 2) - (DX * DX )) * direction(y, A, C2),
-	shift(A, {point, DX, DY}).
-mirror_test_()	-> [
-	?_assert(at_line(	{ line, {point,  0, 0},{point,100,100} },{point, 50, 40}) =:= {point, 40, 50} ),
-	?_assert(at_line(	{ line, {point,  0, 0},{point,-10,-10} },{point,-40,-80}) =:= {point,-80,-40} )
+	Ang	= math:atan(AC2/AC1),
+	AO	=	math:sin(Ang) * AC1,
+	DX		= AC1 * math:sin(Ang*2)*direction(x, A, C1),
+	DY		= math:sqrt(4 * AO * AO - (DX * DX )) * direction(y, A, C2),
+	Shift	= new(DX, DY),
+	shift(A, Shift).
+mirror_test_()	-> 
+		[
+			?_assert(is_similar(mirror({line, {point,0,0}, {point,100,100}}, {point, 50, 40}), {point, 40, 50}, 0.001)),
+			?_assert(is_similar(mirror({line, {point,0,0}, {point,-10,-10}}, {point,-40,-80}), {point,-80,-40}, 0.001))
 ].
 
 %% @doc Направление отрезка по соответствующей оси
 direction(x, A, B) ->
 	{point, Xa, _ } = A,
 	{point, Xb, _ } = B,
-	(Xb-Xa)/abs(Xa-Xb);
+	if
+		Xa /= Xb -> (Xb-Xa)/abs(Xa-Xb);
+		true		 -> 0.0
+end;
 direction(y, A, B) ->
 	{point, _, Ya } = A,
 	{point, _, Yb } = B,
-	(Yb-Ya)/abs(Ya-Yb).
+	if
+		Ya /= Yb -> (Yb-Ya)/abs(Ya-Yb);
+		true		 -> 0.0
+end.
 direction_test_() -> [
-	?assert(direction( x, { point, 10, 10}, {point, 20, 20} ) =:= 1 ),
-	?assert(direction( x, { point, 10, 10}, {point, 00, 20} ) =:=-1 ),
-	?assert(direction( x, { point, 10, 10}, {point, 10, 20} ) =:= 0 ),
-	?assert(direction( y, { point, 10, 10}, {point, 10, 20} ) =:= 1 ),
-	?assert(direction( y, { point, 10, 10}, {point, 10, 00} ) =:=-1 ),
-	?assert(direction( y, { point, 10, 10}, {point, 30, 10} ) =:= 0 )
+	?_assertEqual(direction( x, { point, 10, 10}, {point, 20, 20} ), 1.0	),
+	?_assertEqual(direction( x, { point, 10, 10}, {point, 00, 20} ), -1.0	),
+	?_assertEqual(direction( x, { point, 10, 10}, {point, 10, 20} ), 0.0	),
+	?_assertEqual(direction( y, { point, 10, 10}, {point, 10, 20} ), 1.0	),
+	?_assertEqual(direction( y, { point, 10, 10}, {point, 10, 00} ), -1.0	),
+	?_assertEqual(direction( y, { point, 10, 10}, {point, 30, 10} ), 0.0	)
+].
+
+is_similar(A, B, Tolerance) ->
+	{point, X1, Y1} = A,
+	{point, X2, Y2} = B,
+	Delta = (X1 + Y1 - X2 - Y2) / 2 ,
+	if
+		Delta < Tolerance -> true;
+		true							-> false
+end.
 
 %% @doc Переводит точку в обычную (небинарную) строку вида "X,Y".
 -spec str( point() ) -> string() .
 str(A)		 ->
  {point, X, Y} = A,
+ %lists:concat([[round(X)], ",", [round(Y)]]).
  [round(X), ",", round(Y)].
-str_test() -> ?_assert({point, 9666, 0.13}) =:= [9666, ",", 0.13]).
+str_test() -> ?_assert(str({point, 9666, 0.13}) == [9666, ",", 0]).
